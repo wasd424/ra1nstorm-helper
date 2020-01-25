@@ -55,17 +55,46 @@ function wiz_checksys(\
 function wiz_installreq(\
 	h, failed, status) {
 	h = zenity_progress("Installing required packages (this may take a long time)...", 0, gzenity " --ok-label 'Next' --cancel-label 'Back'")
-	# TODO: support other distros?
-	system("apt update")
-	for (i = 0; i < length(REQPKGS); i++) {
-		print "# Installing " REQPKGS[i] "..." | h
-		if (system("apt install -y " REQPKGS[i]) > 0) {
-			failed = 1
-			print "# Error: failed to install " REQPKGS[i] | h
-			break
-		}
-		print sprintf("%d", 100/length(REQPKGS)*(i+1)) | h
-	}
+
+	#any ubuntu/debian based system
+    if (dist == "DEBIAN") {
+        system("apt update")
+
+        for (i = 0; i < length(REQPKGS); i++) {
+		    print "# Installing " REQPKGS[i] "..." | h
+		    if (system("apt install -y " REQPKGS[i]) > 0) {
+			    failed = 1
+			    print "# Error: failed to install " REQPKGS[i] | h
+			    break
+		    }
+		    print sprintf("%d", 100/length(REQPKGS)*(i+1)) | h
+	    }
+    } else if (dist == "ARCH") { #arch based system
+        #libguestfs and uml_utilities need to be downloaded from AUR instead
+        delete REQPKGS[7]
+        delete REQPKGS[2]
+
+        system("pacman -Syyu")
+
+        #install uml_utilities
+        failed = system("su " + origUser + " <<< 'cd `mktemp -d`; git clone https://aur.archlinux.org/uml_utilities.git; sed -i \"11,12d\" uml_utilities/PKGBUILD; cd uml_utilities && yes | makepkg -si'")
+
+        #install libguestfs
+        print "# Installing libguestfs..." | h
+
+        failed = system("su " + origUser + " <<< 'cd `mktemp -d`; git clone https://aur.archlinux.org/libguestfs.git; cd libguestfs && yes | makepkg -si'")
+
+
+        for (i = 0; i < length(REQPKGS); i++) {
+		    print "# Installing " REQPKGS[i] "..." | h
+		    if (system("pacman -S --noconfirm " REQPKGS[i]) > 0) {
+			    failed = 1
+			    print "# Error: failed to install " REQPKGS[i] | h
+			    break
+		    }
+		    print sprintf("%d", 100/length(REQPKGS)*(i+1)) | h
+	    }
+    }
 	if (!failed) print "# Successfully installed packages" | h
 	status = close(h)
 	if (status == 0 && !failed){
@@ -167,13 +196,12 @@ function wiz_configiommu(\
 	}
 	print "45" | h
 	print "# Patching GRUB..." | h
-	ok = system("(cp /etc/modules.bak /etc/modules ; cp /etc/default/grub.bak /etc/default/grub);" \
-		"cp /etc/modules /etc/modules.bak && cp /etc/default/grub /etc/default/grub.bak &&" \
-		" echo vfio >> /etc/modules && echo vfio_iommu_type1 >> /etc/modules && echo vfio_pci >> /etc/modules && echo vfio_virqfd >> /etc/modules &&" \
+	ok = system( "cp /etc/modules-load.d/modules.conf /etc/modules-load.d/modules.conf.bak && cp /etc/default/grub /etc/default/grub.bak &&" \
+		" echo vfio >> /etc/modules-load.d/modules.conf && echo vfio_iommu_type1 >> /etc/modules-load.d/modules.conf && echo vfio_pci >> /etc/modules-load.d/modules.conf && echo vfio_virqfd >> /etc/modules-load.d/modules.conf &&" \
 		"sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=\"/GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt amd_iommu=on intel_iommu=on /' /etc/default/grub &&" \
 		"echo 'options vfio-pci ids=" pciid "' > /etc/modprobe.d/vfio.conf &&" \
 		"echo 'options vfio_iommu_type1 allow_unsafe_interrupts=1' >> /etc/modprobe.d/vfio.conf &&" \
-		"update-grub2 && update-initramfs -k all -u")
+		"update-grub && mkinitcpio -p linux")
 	if (ok != 0)
 		failed = 1
 	print "70" | h
@@ -184,7 +212,7 @@ function wiz_configiommu(\
 	print "90" | h
 	print "PCI=" pciid > "/opt/ra1nstorm/vmconfig.sh"
 	print "Creating shortcuts..." | h
-	system("cp 'BootVM.sh' $HOME && cp 'BootVM.sh' $HOME/Desktop && chmod 755 $HOME/BootVM.sh && chmod 755 $HOME/Desktop/BootVM.sh")
+	system("cp 'BootVM.sh' /home/" + origUser + "/ && cp 'BootVM.sh' /home/" + origUser + "/Desktop/ && chmod 755 /home/" + origUser + "/BootVM.sh && chmod 755 /home/" + origUser + "/Desktop/BootVM.sh")
 	status = close(h)
 	if (status == 0 && !failed) {
 		wizard_next()
@@ -240,12 +268,12 @@ function main_menu(\
 	if (opt == 1) {
 		init_wizard(0)
 	} else if (opt == 2) {
-		system("(echo RA1NSTORM-"RA1NVER"; uname -a; uptime; df -h; free -m; ls -lR /opt/ra1nstorm; bash /opt/ra1nstorm/OSX-KVM/scripts/lsgroup.sh; dmesg; cat /tmp/ra1nstorm.log; lscpu; lspci -vtnn; lsusb; lsusb -t; lspci -v; lsusb -v) 2>&1 > /tmp/SystemLog.txt && cp /tmp/SystemLog.txt $HOME/Desktop && chmod 666 $HOME/Desktop/SystemLog.txt && chmod 666 /tmp/SystemLog.txt")
+		system("(echo RA1NSTORM-"RA1NVER"; uname -a; uptime; df -h; free -m; ls -lR /opt/ra1nstorm; bash /opt/ra1nstorm/OSX-KVM/scripts/lsgroup.sh; dmesg; cat /tmp/ra1nstorm.log; lscpu; lspci -vtnn; lsusb; lsusb -t; lspci -v; lsusb -v) 2>&1 > /tmp/SystemLog.txt && cp /tmp/SystemLog.txt /home/" + origUser + "/Desktop && chmod 666 /home/" + origUser + "/Desktop/SystemLog.txt && chmod 666 /tmp/SystemLog.txt")
 		zenity_alert("info", "A log file (SystemLog.txt) has been saved on your desktop and in the /tmp folder.\nPlease send it to a ra1n genius for help.")
 	} else if (opt == 3) {
 		init_wizard(7)
 	} else if (opt == 4) {
-		system("bash $HOME/BootVM.sh")
+		system("bash /home/" + origUser + "/BootVM.sh")
 	} else if (opt == 5) {
 		uninstall()
 	} else {
