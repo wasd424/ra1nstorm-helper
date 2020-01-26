@@ -196,12 +196,22 @@ function wiz_configiommu(\
 	}
 	print "45" | h
 	print "# Patching GRUB..." | h
-	ok = system( "cp /etc/modules-load.d/modules.conf /etc/modules-load.d/modules.conf.bak && cp /etc/default/grub /etc/default/grub.bak &&" \
-		" echo vfio >> /etc/modules-load.d/modules.conf && echo vfio_iommu_type1 >> /etc/modules-load.d/modules.conf && echo vfio_pci >> /etc/modules-load.d/modules.conf && echo vfio_virqfd >> /etc/modules-load.d/modules.conf &&" \
-		"sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=\"/GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt amd_iommu=on intel_iommu=on /' /etc/default/grub &&" \
-		"echo 'options vfio-pci ids=" pciid "' > /etc/modprobe.d/vfio.conf &&" \
-		"echo 'options vfio_iommu_type1 allow_unsafe_interrupts=1' >> /etc/modprobe.d/vfio.conf &&" \
-		"update-grub && mkinitcpio -p linux")
+	if (dist == "ARCH") {
+		ok = system( "cp /etc/modules-load.d/modules.conf /etc/modules-load.d/modules.conf.bak && cp /etc/default/grub /etc/default/grub.bak &&" \
+				" echo vfio >> /etc/modules-load.d/modules.conf && echo vfio_iommu_type1 >> /etc/modules-load.d/modules.conf && echo vfio_pci >> /etc/modules-load.d/modules.conf && echo vfio_virqfd >> /etc/modules-load.d/modules.conf &&" \
+				"sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=\"/GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt amd_iommu=on intel_iommu=on /' /etc/default/grub &&" \
+				"echo 'options vfio-pci ids=" pciid "' > /etc/modprobe.d/vfio.conf &&" \
+				"echo 'options vfio_iommu_type1 allow_unsafe_interrupts=1' >> /etc/modprobe.d/vfio.conf &&" \
+				"update-grub && mkinitcpio -P")
+	} else {
+		ok = system("(cp /etc/modules.bak /etc/modules ; cp /etc/default/grub.bak /etc/default/grub);" \
+				"cp /etc/modules /etc/modules.bak && cp /etc/default/grub /etc/default/grub.bak &&" \
+				" echo vfio >> /etc/modules && echo vfio_iommu_type1 >> /etc/modules && echo vfio_pci >> /etc/modules && echo vfio_virqfd >> /etc/modules &&" \
+				"sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT=\"/GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt amd_iommu=on intel_iommu=on /' /etc/default/grub &&" \
+				"echo 'options vfio-pci ids=" pciid "' > /etc/modprobe.d/vfio.conf &&" \
+				"echo 'options vfio_iommu_type1 allow_unsafe_interrupts=1' >> /etc/modprobe.d/vfio.conf &&" \
+				"update-grub && update-initramfs -k all -u")
+	}
 	if (ok != 0)
 		failed = 1
 	print "70" | h
@@ -251,7 +261,11 @@ function uninstall(\
 	print "50" | h
 	system("rm -rf /opt/ra1nstorm")
 	print "90" | h
-	system("cp /etc/default/grub.bak /etc/default/grub; cp /etc/modules.bak /etc/modules")
+	if (dist == "ARCH") {
+		system("cp /etc/default/grub.bak /etc/default/grub; cp /etc/modules-load.d/modules.conf.bak /etc/modules-load.d/modules.conf")
+	} else {
+		system("cp /etc/default/grub.bak /etc/default/grub; cp /etc/modules.bak /etc/modules")
+	}
 	print "# ra1nstorm has been successfully removed." | h
 	close(h)
 	if (zenity_alert("question", "ra1nstorm has been removed. You will need to reboot for the changes to take effect.\nReboot now?") == 0) {
@@ -282,7 +296,7 @@ function main_menu(\
 }
 
 BEGIN {
-	RA1NVER = "0.9.5"
+	RA1NVER = "0.9.6"
 	gtitle = "ra1nstorm"
 	gzenity = "--width 800 --height 480"
 	split("python qemu uml-utilities virt-manager dmg2img git wget libguestfs-tools", REQPKGS, " ")
