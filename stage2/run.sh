@@ -6,7 +6,6 @@ export LANG=C
 ID="$(id -u)"
 STARTDIR="$(pwd)"
 DISTRO=""
-USER_AT_START="$USER"
 
 echo $USER_AT_START
 
@@ -31,4 +30,4 @@ else
 	exit
 fi
 echo "Launching setup..."
-gawk -v origUser="$USER_AT_START" -v dist="$DISTRO" -f main.awk 2>&1 | tee -a /tmp/ra1nstorm.log
+gawk -v origUser="$SUDO_USER" -v dist="$DISTRO" -f main.awk 2>&1 | tee -a /tmp/ra1nstorm.log

@@ -58,6 +58,7 @@ function wiz_installreq(\
 
 	#any ubuntu/debian based system
     if (dist == "DEBIAN") {
+        split("python qemu uml-utilities virt-manager dmg2img git wget libguestfs-tools", REQPKGS, " ")
         system("apt update")
 
         for (i = 0; i < length(REQPKGS); i++) {
@@ -71,20 +72,23 @@ function wiz_installreq(\
 	    }
     } else if (dist == "ARCH") { #arch based system
         #libguestfs and uml_utilities need to be downloaded from AUR instead
-        delete REQPKGS[7]
-        delete REQPKGS[2]
+        split("python qemu virt-manager dmg2img git wget", REQPKGS, " ")
+        REQPKGS[0] = "python"
 
         system("pacman -Syyu")
 
         #install uml_utilities
-        failed = system("su " + origUser + " <<< 'cd `mktemp -d`; git clone https://aur.archlinux.org/uml_utilities.git; sed -i \"11,12d\" uml_utilities/PKGBUILD; cd uml_utilities && yes | makepkg -si'")
+        print "# Installing uml_utilities..." | h        
 
-        #install libguestfs
-        print "# Installing libguestfs..." | h
+        failed = system("su " origUser " <<< 'cd `mktemp -d`; git clone https://aur.archlinux.org/uml_utilities.git; sed -i \"11,12d\" uml_utilities/PKGBUILD; cd uml_utilities && yes | makepkg -si'")
 
-        failed = system("su " + origUser + " <<< 'cd `mktemp -d`; git clone https://aur.archlinux.org/libguestfs.git; cd libguestfs && yes | makepkg -si'")
+        if (system("pacman -Qi libguestfs") !=  0) {
+            #install libguestfs
+            print "# Installing libguestfs... (This may take a long time)" | h
+            failed = system("su " origUser " <<< 'cd `mktemp -d`; git clone https://aur.archlinux.org/libguestfs.git; cd libguestfs && yes | makepkg -si'")
+        }
 
-
+        system("echo 'installing required packages'")
         for (i = 0; i < length(REQPKGS); i++) {
 		    print "# Installing " REQPKGS[i] "..." | h
 		    if (system("pacman -S --noconfirm " REQPKGS[i]) > 0) {
@@ -222,7 +226,7 @@ function wiz_configiommu(\
 	print "90" | h
 	print "PCI=" pciid > "/opt/ra1nstorm/vmconfig.sh"
 	print "Creating shortcuts..." | h
-	system("cp 'BootVM.sh' /home/" + origUser + "/ && cp 'BootVM.sh' /home/" + origUser + "/Desktop/ && chmod 755 /home/" + origUser + "/BootVM.sh && chmod 755 /home/" + origUser + "/Desktop/BootVM.sh")
+	system("cp 'BootVM.sh' /home/" origUser "/ && cp 'BootVM.sh' /home/" origUser "/Desktop/ && chmod 755 /home/" origUser "/BootVM.sh && chmod 755 /home/" origUser "/Desktop/BootVM.sh")
 	status = close(h)
 	if (status == 0 && !failed) {
 		wizard_next()
@@ -282,12 +286,12 @@ function main_menu(\
 	if (opt == 1) {
 		init_wizard(0)
 	} else if (opt == 2) {
-		system("(echo RA1NSTORM-"RA1NVER"; uname -a; uptime; df -h; free -m; ls -lR /opt/ra1nstorm; bash /opt/ra1nstorm/OSX-KVM/scripts/lsgroup.sh; dmesg; cat /tmp/ra1nstorm.log; lscpu; lspci -vtnn; lsusb; lsusb -t; lspci -v; lsusb -v) 2>&1 > /tmp/SystemLog.txt && cp /tmp/SystemLog.txt /home/" + origUser + "/Desktop && chmod 666 /home/" + origUser + "/Desktop/SystemLog.txt && chmod 666 /tmp/SystemLog.txt")
+		system("(echo RA1NSTORM-"RA1NVER"; uname -a; uptime; df -h; free -m; ls -lR /opt/ra1nstorm; bash /opt/ra1nstorm/OSX-KVM/scripts/lsgroup.sh; dmesg; cat /tmp/ra1nstorm.log; lscpu; lspci -vtnn; lsusb; lsusb -t; lspci -v; lsusb -v) 2>&1 > /tmp/SystemLog.txt && cp /tmp/SystemLog.txt /home/" origUser "/Desktop && chmod 666 /home/" origUser "/Desktop/SystemLog.txt && chmod 666 /tmp/SystemLog.txt")
 		zenity_alert("info", "A log file (SystemLog.txt) has been saved on your desktop and in the /tmp folder.\nPlease send it to a ra1n genius for help.")
 	} else if (opt == 3) {
 		init_wizard(7)
 	} else if (opt == 4) {
-		system("bash /home/" + origUser + "/BootVM.sh")
+		system("bash /home/" origUser "/BootVM.sh")
 	} else if (opt == 5) {
 		uninstall()
 	} else {
@@ -299,7 +303,6 @@ BEGIN {
 	RA1NVER = "0.9.6"
 	gtitle = "ra1nstorm"
 	gzenity = "--width 800 --height 480"
-	split("python qemu uml-utilities virt-manager dmg2img git wget libguestfs-tools", REQPKGS, " ")
 	wizard[0] = "wiz_intro"
 	wizard[1] = "wiz_checksys"
 	wizard[2] = "wiz_installreq"

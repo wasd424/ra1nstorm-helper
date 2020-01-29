@@ -62,14 +62,27 @@ following:
 No you cannot. When ra1nstorm forwards the USB controller to MacOS, your system will crash.
 
 #### 7. Can I use other Linux distros that aren't Ubuntu?
-##### No.
-No, they are currently not supported, but probably will be in the future.
-###### Well, actually, you can, sorta. Follow the instructions at [macOS-Simple-KVM](https://github.com/foxlet/macOS-Simple-KVM), but this is not supported by ra1nstorm and you're basically on your own.
+##### Yes.
+Yes, Arch linux is also supported.
+###### If you don't have Ubuntu or Arch, follow the instructions at [macOS-Simple-KVM](https://github.com/foxlet/macOS-Simple-KVM), but this is not supported by ra1nstorm and you're basically on your own.
 
 #### 8. I can't boot Xubuntu. I get a security error.
 ##### Disable Secure Boot.
 You need to disable Secure Boot in your BIOS. It varies by motherboard and computer,
 but it is generally simple to do and the option is always labeled `Secure Boot`.
+
+#### 9. I cannot connect to update server to install macOS
+##### Change boot-macOS-Catalina.sh
+Tap networking may not work for some users and they will have to switch to user networking
+Open the script: sudo vim /opt/ra1nstorm/OSX-KVM/boot-macOS-Catalina.sh
+Then change the line
+```
+-netdev tap,id=net0,ifname=tap0,script=no,downscript=no -device vmxnet3,netdev=net0,id=net0,mac=52:54:00:c9:18:27 \
+```
+to
+```
+-netdev user,id=net0 -device vmxnet3,netdev=net0,id=net0,mac=52:54:00:c9:18:27 \
+```
 
 ## Important Notice
 
